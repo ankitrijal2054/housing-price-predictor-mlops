@@ -4,3 +4,4 @@ model/
 __pycache__/
 .dvc/
 !data/raw/*.dvc
+.DS_Store
