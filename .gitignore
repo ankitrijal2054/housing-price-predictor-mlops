@@ -6,3 +6,4 @@ __pycache__/
 !data/raw/*.dvc
 !data/processed/*.dvc
 .DS_Store
+mlruns/
