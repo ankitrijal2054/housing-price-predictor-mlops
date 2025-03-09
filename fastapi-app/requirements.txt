@@ -2,3 +2,4 @@ FastAPI
 xgboost
 pandas
 uvicorn
+scikit-learn
