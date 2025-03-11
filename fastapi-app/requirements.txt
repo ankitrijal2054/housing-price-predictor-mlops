@@ -3,3 +3,4 @@ xgboost
 pandas
 uvicorn
 scikit-learn
+prometheus-fastapi-instrumentator

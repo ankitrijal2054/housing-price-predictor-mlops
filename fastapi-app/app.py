@@ -3,6 +3,7 @@ import xgboost as xgb
 import pandas as pd
 import uvicorn
 import json
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Define paths
 MODEL_PATH = "models/xgboost_model.json"
@@ -13,6 +14,9 @@ model.load_model(MODEL_PATH)
 
 # Initialize FastAPI app
 app = FastAPI()
+
+# Add Prometheus monitoring
+Instrumentator().instrument(app).expose(app)
 
 @app.get("/")
 def home():
