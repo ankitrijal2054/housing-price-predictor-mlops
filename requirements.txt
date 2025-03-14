@@ -3,6 +3,8 @@ pandas
 scikit-learn
 xgboost
 mlflow
+dvc[s3]
 fastapi
 uvicorn
-dvc
+docker
+
