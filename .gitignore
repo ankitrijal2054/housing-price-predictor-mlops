@@ -1,10 +1,7 @@
 venv/
-data/
 model/
 __pycache__/
 .dvc/
-!data/raw/*.dvc
-!data/processed/*.dvc
 .DS_Store
 mlruns/
 .dvc/config
