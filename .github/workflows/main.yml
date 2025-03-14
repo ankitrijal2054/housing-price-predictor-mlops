@@ -1,0 +1,90 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main 
+    paths:
+      - 'data/raw/**'                
+      - 'src/data_preprocessing.py'   
+      - 'src/train_model.py'          
+      - 'src/app.py'                 
+      - '.github/workflows/cicd-pipeline.yml'
+
+jobs:
+  preprocess-train-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Data Preprocessing
+        run: |
+          python src/data_preprocessing.py
+
+      - name: Push Processed Data to DVC Remote
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          dvc add data/processed/housing_processed.csv
+          git add data/processed/housing_processed.csv.dvc
+          git commit -m "Updated processed dataset"
+          git push origin main
+          dvc push
+
+      - name: Train Model
+        run: |
+          python src/train_model.py
+
+      - name: Push Model to DVC Remote
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          dvc add models/xgboost_model.json
+          git add models/xgboost_model.json.dvc
+          git commit -m "Updated model after retraining"
+          git push origin main
+          dvc push
+
+      - name: Log in to Docker Hub
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+      - name: Build and Push Docker Image
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          docker build -t $DOCKER_USERNAME/housing_price_api:latest .
+          docker push $DOCKER_USERNAME/housing_price_api:latest
+
+      - name: Deploy to AWS EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ubuntu
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          ssh -i private_key.pem ubuntu@$HOST << 'EOF'
+            docker stop housing_price_api || true
+            docker rm housing_price_api || true
+            docker pull $DOCKER_USERNAME/housing_price_api:latest
+            docker run -d -p 8000:8000 $DOCKER_USERNAME/housing_price_api:latest
+            sudo systemctl restart nginx
+          EOF
